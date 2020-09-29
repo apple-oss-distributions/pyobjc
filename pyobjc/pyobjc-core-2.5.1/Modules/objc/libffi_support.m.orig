@@ -3853,11 +3853,7 @@ PyObjCFFI_Caller(PyObject *aMeth, PyObject* self, PyObject *args)
 	PyErr_Clear();
 	ffi_type* retsig = signature_to_ffi_return_type(rettype);
 	if (retsig == NULL) goto error_cleanup;
-	if (variadicAllArgs) {
-		r = ffi_prep_cif_var(&cif, FFI_DEFAULT_ABI, Py_SIZE(methinfo), r, retsig, arglist);
-	} else {
-		r = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, r, retsig, arglist);
-	}
+	r = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, r, retsig, arglist);
 	if (r != FFI_OK) {
 		PyErr_Format(PyExc_RuntimeError,
 			"Cannot setup FFI CIF [%d]", r);
@@ -4043,7 +4039,7 @@ PyObjCFFI_MakeClosure(
 	void* userdata)
 {
 	ffi_cif *cif;
-	ffi_closure_wrapper *cl;
+	ffi_closure *cl;
 	ffi_status rv;
 
 	cif = PyObjCFFI_CIFForSignature(methinfo);
@@ -4064,7 +4060,7 @@ PyObjCFFI_MakeClosure(
 	describe_cif(cif);
 	printf("\n\n");*/
 
-	rv = ffi_prep_closure_loc(cl->closure, cif, func, userdata, cl->code_addr);
+	rv = ffi_prep_closure(cl, cif, func, userdata);
 	if (rv != FFI_OK) {
 		PyObjCFFI_FreeCIF(cif);
 		PyErr_Format(PyExc_RuntimeError,
@@ -4072,7 +4068,7 @@ PyObjCFFI_MakeClosure(
 		return NULL;
 	}
 
-	return (IMP)cl->code_addr;
+	return (IMP)cl;
 }
 
 /* 
@@ -4084,11 +4080,11 @@ void*
 PyObjCFFI_FreeClosure(IMP closure)
 {
 	void* retval;
-	ffi_closure_wrapper* cl;
+	ffi_closure* cl;
 
-	cl = PyObjC_closure_from_code(closure);
-	retval = cl->closure->user_data;
-	PyObjCFFI_FreeCIF(cl->closure->cif);
+	cl = (ffi_closure*)closure;
+	retval = cl->user_data;
+	PyObjCFFI_FreeCIF(cl->cif);
 	PyObjC_free_closure(cl); /* XXX: error handling */
 
 	return retval;
